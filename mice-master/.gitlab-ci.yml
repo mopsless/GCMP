@@ -1,0 +1,69 @@
+variables:
+  GIT_DEPTH: "1"
+
+image: python:3.11
+
+stages:
+  - execute
+  - convert
+
+execute-job:
+  stage: execute
+  script:
+    - pip install jupyter nbformat
+    - pip install -r requirements.txt
+    - ./scripts/execute_notebooks.sh
+  artifacts:
+    when: on_success
+    paths:
+      - artifacts/notebooks
+      - artifacts/out
+
+convert-html-job:
+  stage: convert
+  needs:
+    - job: execute-job
+      artifacts: true
+  script:
+    - pip install jupyter nbformat
+    - ./scripts/convert2html.sh
+  artifacts:
+    when: on_success
+    paths:
+      - artifacts/html
+
+convert-html-to-pdf-job:
+  stage: convert
+  image: ubuntu:focal
+  needs:
+    - job: convert-html-job
+      artifacts: true
+  script:
+    - ln -sf /usr/share/zoneinfo/Europe/Kiev /etc/localtime
+    - apt update -y
+    - apt install -y curl
+    - curl -LO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    - apt-get install -y ./google-chrome-stable_current_amd64.deb
+    - source scripts/convert2pdf.sh
+  artifacts:
+    when: on_success
+    paths:
+      - artifacts/pdf
+
+compile-tex-job:
+  stage: convert
+  image: registry.gitlab.com/islandoftex/images/texlive:latest
+  script:
+    - mv artifacts/out out
+    - mkdir -p artifacts/pdf
+    - cd text
+    - pdflatex -file-line-error -interaction=nonstopmode -synctex=1 -output-format=pdf -output-directory=../artifacts/pdf *.tex
+  after_script:
+    - cat *.log
+  artifacts:
+    paths:
+      - artifacts/pdf
+  needs:
+    - job: execute-job
+      artifacts: true
+

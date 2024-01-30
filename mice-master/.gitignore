@@ -1,0 +1,10 @@
+.idea/*
+data/*
+notebooks/lib/*
+out/*
+venv/*
+*.ipynb_checkpoint*
+*.log
+*.pdf
+*.aux
+*.gz

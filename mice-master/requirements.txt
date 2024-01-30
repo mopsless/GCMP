@@ -1,0 +1,11 @@
+pandas~=1.5.3
+numpy
+matplotlib
+networkx
+pyvis
+scipy
+tqdm
+statsmodels
+seaborn
+scikit-learn~=1.2.2
+igraph

@@ -1,0 +1,393 @@
+\documentclass{article}
+\usepackage{blindtext}
+\usepackage{graphicx}
+\usepackage{glossaries}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{cleveref}
+\usepackage{amsfonts}
+\usepackage{algpseudocode}
+\usepackage{algorithmicx}
+
+\title{Analysis of a neural activity in a hippocampus of a rodent with a method of a spiking neural networks}
+\author{Andrew Zaitsew, DSBA, NRU HSE}
+\date{\today}
+\begin{document}
+	\newcommand{\img}[2]{
+		\begin{figure}[ht!]
+			\centering
+			\includegraphics[width=0.6\textwidth]{#1}
+			\caption{#2}
+		\end{figure}
+	}
+	\maketitle
+	\section{Abstract}\label{sec:abstract}
+	In this work we have applied a set of different methods including but not limited to spiking neural networks
+	in order to analyse the relation of spatial location of a rodent to neural activity in its' hippocampus.
+	The findings show that the process of learning spatial topology is highly dynamic. Additionally we suggest a set
+	of methods for building a graph of neural network.
+	\section{Introduction}\label{sec:intorduction}
+
+	During this research we have used a set of methods and metrics to build a graph of a neural connections in
+	a hippocampus of a rodent. We have begun from building a single graph which can be interpreted as a \"final\" graph
+	of neural connections. This graph has shown the connections inside of a hippocampus. Additionally a set of graphs
+	was built on top of time-sequenced data in order to analyse dynamics of a connection genesis.
+	Also a modeling of a well-related neurons connection was tried both on sequenced data by time and unsequenced. The
+	modeling attempts has shown that during the process of a rodent being on arena the relations between neurons constantly
+	change which indicates that memory is constantly updated even for known areas of space. %TODO: elaborate on results(unlikely to be good but anyway...)
+	In order to improve our understanding of the dataflow we have additionally tried to find a significant relations between
+	the spatial position of a rodent and some particular neuron. Though this analysis did not found anything which can
+	be efficiently used for further researches. %TODO: extend this paragraph if we would find any spatial realtion in slices
+	\section{Data}\label{sec:data}
+
+	The data which was used in this research is based on expirement with a rodents\footnote{Konstantin Anokhin, MSU, 20??}.
+	First the rodent was injected with a modified virus which lead to change in genes of neurons responsible for balance
+	of a specific chemical elements which further interact with calcium ions when neuron activation level is rising
+	leading to light emission from neuron proportional to its activity. Then a camera was injected
+	into the brain of a rodent in order to closely monitor the activity of a neurons in a hippocampus. In the same time
+	rodent was putted on a circle arena containing one, two or three round equally-sized obstacles. All movements of the rodent
+	on the arena was recorded as well as lightning levels recorded by a camera. The duration of experiment was about 15 minutes.
+	The discretization frequency of the recording of neural activity is 20Hz.
+	\subsection{Preprocessing}\label{subsec:preprocessing}
+
+	Resulting two video streams(stream with activity of neurons) were processed by removing background noise, increasing
+	the contrast of video with movements of a rodent. For performing this the CaImAn and KDEnlive was used. After this
+	with help of CNMFE-E method(Contrained Nonnegative Matrix Factorization for microEndoscopic data) the candidate neurons
+	was identified by spikes.
+
+	The mouse movements was obtained by a following method. The center of masses of obstcales on contrasted version of video
+	were calculated and then substracted. After this video was processed by calculating the center of mass of each frame
+	with a condition that each frame it should move at least 25 millimeters(otherwise frame was skipped). The position
+	of this center of mass is assumed to be corresponding to the center of mouse.
+	\subsection{Resulting data}\label{subsec:resulting-data}
+
+	The collected data was united in the dataframe containing information on position, activity of each neuron and corresponding
+	to this values times(number of seconds from the beggining of a recording). On the figures 1 and 2 you may see resulting
+	trace of an arenas with 3 and 1 obstacles corresspondingly composed from all points recorded to the dataset.
+	\img{../out/3hole.png}{Trace of an arena with 3 obstacles}{fig3hole}
+	\img{../out/1hole.png}{Trace of an arena with 1 obstacle}{fig1hole}
+	Additionally the data was normalized in order to prevent bias in models which are sensitive to heteroskedastic or
+	unnormalized data. Below on figure 3 you may see a neural acitivity example for a data recorded on an arena with
+	1 obstacle.
+	\img{../out/42_activity.png}{Example of neural activity}
+	\subsection{Normalization of data}\label{subsec:normalization-of-data}
+
+     In this subsection we briefly describe the mathematical details of performed normalization.
+	The normalization was performed for all timeseries in the dataset excluding time.
+	The normalization is scaling each feature between $0$ and $1$ where $1$ corresponds to maximum
+	value in given series, and $0$ to minimum one.
+	Given the arbitrary series from the dataset, say $\vec{U}$ the normalization for it as follows
+	\footnote{$/$ in this formula determines the elementwise division of vector by number}
+	:
+	\[
+		\vec{U}_{normalized} = (\vec{U} - \min{U}) / (\max{U} - \min{U})\space\space\space
+	\]
+
+
+	\section{Preliminary analysis}\label{sec:preliminary-analysis}
+
+	Before analyzing in-depth we have performed an analysis of activity. This includes the explarotary analysis of activity
+	as well as statistical tests on distribution. Such analysis will help us to choose hyperparameters for our models
+	in further work.
+
+	On the below plots activity of two neurons are illustrated. The figure 4 shows that the neuron activity recording
+	during the whole recorded period. We may see that is has rare spikes. This spikes occurs when neuron is polarized and
+	contain the most information which is transmitted by the neuron. From the plot we may conclude that the neuron is
+	rarely activated and does not act as important during the information transmission. It is important to assess activity
+	levels of such neurons in further work as they may create false values of metrics since their recorded activity is
+	correlated with the noise which occurs both from other neurons and camera artifacts.
+	\img{../out/0_activity.png}{Activity of neuron 0, arena with 3 obstacles}
+	The figure 5 shows example neuron which is activated much more frequently giving the larger amounts of information.
+	The spikes are much more frequent though this leads to increased variance which also should be considered in further
+	model development.
+	\img{../out/5_activity.png}{Activity of neuron 5, arena with 3 obstacles}
+	Below the plots of distributions are shown on figure 6 and figure 7 correspondingly. We may see that indeed variance
+	that is observed in the activity of neuron 0 is smaller compared to neuron 5. Additioanlly neuron 5 has slightly
+	bigger mean, though this is likely to be caused by spikes which create outliers.
+	\img{../out/0.0_dist.png}{Activity of neuron 0, arena with 3 obstacles}
+	\img{../out/5.0_dist.png}{Activity of neuron 5, arena with 3 obstacles}
+	\subsection{Conclusion}\label{subsec:conclusion}
+	The basic analysis of the activity patterns has shown that the neurons may have different behaviour during the recording
+	which shows that models which are used should be applied taking in account that patterns of neural activation may vary
+	as well as noise parameters.
+	\section{Graphing neural network}\label{sec:graphing-neural-network}
+
+	\subsection{Purpose}\label{subsec:purpose}
+	The graph of neural network would help in understanding the process of learning and exploring topology of an arena by
+	a rodent. Looking on such graphs in the dynamics may be extremely useful for understanding the way how rodent understands
+	and learns the space around as well as how the space memory is translated into the synapses and synaptic strengths.
+	\subsection{Intuition behind the graph}\label{subsec:intuition-behind-the-graph}
+	While neural networks which are used in machine learning are single or bidirectional the biological neural networks
+	may be multidirectional. The STDP\footnote{Spike-Timing Dependent Plasticity} suggests that if there is two neurons
+	connected with a synapse and the pre-synaptic is fired after post-synaptic one the synapse strength reduced
+	and if vice-a-versa the synapse-strength is reduced. In other words, the brain tries to greedely reduce path length.
+	This may be illustrated in the following example. Suppose we have a graph on three neurons namely $A$,$B$, $C$ and a
+	set of directed edges(i.e. synapses which are not weighted for convenince). $\{(A,B), (B,C)\}$. Then on first step the
+	weight of synapse between $A$ and $C$ increases and we would get a new edge in our set: $(A,C)$. In the same time
+	spikes from $A$ to $C$ are now traveling faster as there is no need to keep $B$ in this path as its' polarization
+	takes time making it to activate approximately before $C$.
+	And this leads to reduce in the strength of a relation
+	between $B$ and $C$ reducing duplicating path $(A,B,C)$\footnote{Duplicates $(A,C)$} by removing edge $(B,C)$.
+
+	Our goal in building graphs is to understand the existing relations during the observed period this would help us
+	further to understand which connections are permanent.
+	After this we may observe graph changes using slicing all data in small parts by time.
+
+	Aim of such graph is to represent the synapses that connects neurons as well as their strength or weight.
+
+	\subsection{Definition and construction of graph}\label{subsec:definition-and-construction-of-graph}
+	The basic definition of graph is
+	\[
+	 G=(V,E)
+	\]
+	In our case the set of vertices is a set of neuron, i.e. has form
+	\[
+		V=\{0, 1, \dots, n\}
+	\]
+	In the same time our edge is directed and weighted and is should be represented by a triplet. Such triplet
+	would contain number of source vertex, number of destination vertex and the weight. From neurobiologic perspective
+	it contains pre-synaptic neuron, post-synaptic neuron and the estimate of synaptic strength. In mathematical terms
+	\[
+		(a, b, \hat\rho) \in E
+	\]
+	where:
+
+	\textbullet    $a\in V$
+
+	\textbullet    $b\in V$
+
+	\textbullet    $\hat\rho = \rho(a, b)$
+
+	$\rho$ here is pseudo-metric. Under word \"pseudo\" we mean that it not neccesserily has all properties corresponding
+	to standard definition of metric. We rather mean that this metric is used to measure distances though mostly likely
+	that $(V, \rho)$ is metric space.
+
+	In current definition graph is full, i.e. contains all possible edges. Such graph is equivalent to a set of neurons
+	with pre-meausered $\rho$. Though such graph is unlikely to be useful in a research. So we would like also to define
+	$\underline\rho$ which is a constant determined emperically.
+
+	Then set of edges for the graph would be defined as follows:
+	\[
+		E=\{(a,b, \rho(a,b)) | a,b \in V, \rho(a,b)>\underline{\rho}\}
+	\]
+
+	\subsection{Metrics}\label{subsec:metrics}
+	In this section we would define the boundaries for metrics we would use further.
+	\subsubsection{Shifting data}
+	As we described in \Cref{sec:data} section for each neuron we have a vector of data, i.e.
+	\[
+		\vec{A}_n = (a_1^n, a_2^n, \dots, a_t^n)
+	\]
+	where $n$ denotes number of neuron and $t$ denotes time.
+
+	As previously mentioned we would like to design metric which can assess the influence of one's neuron activity on
+	another one.
+	In order to do this we would need to compare the \"previous\" value of activity of pre-synaptic neuron candidate with
+	activity on a post-synaptic candidate neuron.
+	So we would need to shift our vectors by $k$ entries($k$ should be adjusted with according to the discretization rate,
+	in our case $k=1$ unless stated otherwise).
+	The shift operation is as follows:
+	\[
+		s(\vec{U}, k) = (U_1, U_2, \dots, U_{T-k})
+	\]
+	where $k \in \mathbb{Z}, k > 0$, $T=\dim(\vec{U})$
+
+	For $k\in \mathbb{Z}, k < 0$
+	\[
+		s(\vec{U}, k) = (U_{k+1}, U_{k+2}, \dots, U_{T})
+	\]
+
+	Intuitively saying the value $i$ if $s(\vec{U}, k)$ would correspond to value $i + k$ in $s(\vec{U}, -k)$ fon
+	any $k\in\mathbb{Z}, k > 0$.
+
+	\subsubsection{Pseudo-metric of synaptic strength definition}
+	As we previously said our metric is a actually the way to estimate the synaptic strength between to neurons.
+	So what we actually from our metric is that it should map two vectors of neural activity to some real number preserving
+	synaptic strength(the more synaptic strength is the bigger resulting number should be). Also we should remember that
+	out vectors needs to be shifted as the effect of pre-synaptic neuron on the post-synaptic neuron is slightly delayed.
+
+	So the metric of synaptic strength should be as follows:
+	\[
+		\rho: \mathbb{R}^{T-k}\times\mathbb{R}^{T-k} \to \mathbb{R}
+	\]
+
+	where:
+
+	\textbullet  $T$ denotes recording length
+
+	\textbullet $k$ is fixed number by which we shift our series
+				\footnote{Intuitevely saying this our expactation of delay between of effect of pre-synaptic neuron on post-synaptic one}
+
+	\subsection{Graph assessment}\label{subsec:graph-assessment}
+
+	Before we start building graphs we should state how do we assess the result.
+	The key criterion is that our graph should be alike with neural network
+	though such criterion is not clear enough to be applied in practice.
+
+	More clear criterion is associated with the several important facts about the neural networks.
+	First of all as we previously mention STDP is one of the ways how synaptic strength is adjusted.
+	The process of path reduction which is result of STDP leading to the arousal of local\footnote{
+	    In fact the neural network may have cycles which are long enough, but in the same time a small cycles where
+	    signal travels fast would lead to the decay of a synaptic strength.
+	} spanning trees.
+	As one of the colloraries of STDP is absence of the cycles of size $2$ in short term as just when synapse established
+	from post-synaptic neuron to pre-synaptic it would lead to the decay in synaptic strength of synapse working in other
+	direction(or would quickly reduce own synaptic strength).
+	So we would not expect to see such cycles if we are doing
+	all correctly.
+
+	Another important boundary is presence of rich-clubs.
+	Rich-clubs are observed in many biological systems, but for cognitome they are especially reasonable
+	as a system of distributing information between different subsystems.
+	Such rich clubs may also migrate, i.e. change the neural connections, though we would expect our graph to
+	have at least one.
+
+	Additionally we expect that most of neurons will have synapses as the neural network should connected.
+	In case if the connection amount is too small this means that actually neural network unable to store and
+	transmit information.
+	Such networks would not give a significant results which would be useful in further research.
+
+	Last but not the least is the visual analysis.
+	Using visual analysis we may understand not only previously mentioned properties of the graph
+	but also came up with new conclusions which can not be done with formal analysis.
+
+	\subsection{Graphs}\label{subsec:graphs}
+
+	In this section we would describe the different metrics used for building graphs along with the results which we
+	were able to get.
+	In order to build the graph we have used the following algorithm for given $\rho,\underline{\rho}, k$ and $N$(a matrix of neural activity)
+	\begin{algorithmic}[1]
+	\Function{BuildGraph}{$\rho, k, N, \underline{\rho}$}
+	\State $h \leftarrow \dim(N^{(1)})$ \Comment{Obtain a height of matrix}
+	\State $w \leftarrow \dim(N_{(1)})$ \Comment{Obtain a width of matrix}
+	\State $V \leftarrow \{1,\dots,w\}$
+	\State $E \leftarrow \{\}$
+	\For{i $\in 1\dots h$}
+	    \For{j $\in 1\dots h, i\ne j$}
+	         \State $\hat{\rho}\leftarrow\rho(s(N^{(i)}, k), s(N^{(j)}, -k))$
+	         \If{$\hat{\rho} \geq \underline{\rho}$}
+	             \State $E\leftarrow E\cup \{(i,j,\hat{\rho})\}$
+	         \EndIf
+	    \EndFor
+	\EndFor
+	\State Result$\leftarrow (V, E)$
+	\EndFunction
+	\end{algorithmic}
+
+	\subsubsection{Correlation metric}
+
+	The correlation is the most common and simple way to measure effect of one variable to another.
+	The correlation coefficient is a statistical measure that describes the degree to which two variables are linearly related.
+	In context of our research, the correlation between the firing rates of two neurons over time can be an efficient
+	as a proxy variable for synaptic strength.
+
+	Given vectors $\vec{A}$ and $\vec{B}$ of neural activity\footnote{Here and further we assume that this vectors are
+	already shifted unless stated otherwise}, the Pearson correlation measure would be as follows:
+	\[
+		\rho(\vec A, \vec B) = \frac{
+			\sum_{i=1}^{n} (\vec A_i-\bar{A})(\vec B_i-\bar{B})
+		} {
+			\sqrt{\sum_{i=1}^{n} (\vec A_i-\bar{B})^2 \sum_{i=1}^{n} (\vec B_i-\bar{B})^2}
+		}
+	\]
+	where $\bar{A} = \frac{\sum_{i=1}^{T-k} \vec{A}_i}{T-k}$, $\bar{B} = \frac{\sum_{i=1}^{T-k} \vec{B}_i}{T-k}$
+
+	We have applied the above procedure with using correlation measure in order to match the neurons.
+	As a preliminary step we have built the distribution of the correlation metric.
+	On the figure 8 you may see that most neurons are uncorrelated but the distribution
+	has a long tail which indicates that there is a set of neurons which indeed correlated. In spite
+	this distribution we have choosen the correlation lower boundaray as $0.4$(i.e. $\underline{\rho}=0.4$).
+	Such metric would filter out most of false connections.
+	\img{../out/correlation_full_dist.png}{Distirbution of correlation metric}
+
+	After building a graph we have visualised the results using igraph library. The resulting visualisation you may
+	see the graph on figure 9.
+	\img{../out/correlation_sequencing.png}{The correlation based cognitome graph}
+
+	The graph is shown on the figure 9 has high level of connectivity but in the same time it has multi-edges.
+	The reason for multi-edges may be low value of $\underline{\rho}$.
+	Though such event is not likely as even neuron which are not connected with main parts of the network have multi-edges
+	which indicates either a problem with a method or general approach.
+
+	In order to verify that the reason for multi-edges is not low value of $\underline{\rho}$ we have also tried use
+	higher correlation boundary $\underline{\rho} = 0.5$.
+	The resulting graph is illustrated on figure 10.
+	\img{../out/correlation_sequencing_0.5}{Correlation-based cognitome graph with $\underline{\rho}=0.5$}
+
+	We may see that graph has much less connectivity compared to previous one, but the problem of multi-edges persists.
+	This indicates that correlation can not be used as metrics for building graphs with use of this approach as it can not
+	be used for distinction of post-synaptic and pre-synaptic neuron creating multi-edges which leads to loss of the information
+	on data direction in neural network.
+	
+	\subsubsection{Coherence}
+	Coherence is a measure of the linear correlation between two signals.
+	In this subsection we would for out convenience denote\footnote{Here we also assume that $\vec{A}_t$ and $\vec{B}_t$
+	 are already shifted and pre-processed accordingly
+	}
+	$x(t)=\vec{A}_t$ and $y(t)=\vec{B}_t$ so we would consider
+	signals as time-series rather then vectors.
+	Additionally we would give a definition for continuous time-series assuming that our considered vectors has infinite
+	dimensions.
+	Though this case may be simplified towards finite-dimensions vectors.
+
+	The coherence $C_{xy}(f)$ between two signals $x(t)$ and $y(t)$ is defined as follows:
+    \[
+	C_{xy}(f) = \frac{|G_{xy}(f)|^2}{G_{xx}(f) G_{yy}(f)}
+    \]
+	Here, $G_{xy}(f)$ is the cross-spectral density of $x(t)$ and $y(t)$,
+	and $G_{xx}(f)$ and $G_{yy}(f)$ are the power spectral densities of $x(t)$ and $y(t)$, respectively.
+	The cross-spectral density is the Fourier transform of the cross-correlation function, and the power spectral density
+	is the Fourier transform of the autocorrelation function. $f$ here denotes frequency and measure in Hertzs(Hz).
+	The cross-spectral density is defined as follows:
+	\[
+		G_{xy}(f) = F(R_{xy}(\tau))
+	\]
+	where $F$ denotes the Fourier transform,
+	and $R_{xy}(\tau)$ is the cross-correlation function
+	\footnote{
+		Defined as follows: $R_{xy}=\int_{-\infty}^{+\infty}x(t)y(t+\tau)dt$
+	}
+	of $x(t)$ and $y(t)$.
+	The coherence is a function of frequency, and it ranges from $0$ (no coherence) to $1$ (perfect coherence).
+
+	In the context of the neural activity analysis the coherence would show the consistency in activation of different
+	neurons on different frequencies. As synapse is working on different rate in the same manner we expect
+	to observe a high coherence of the connected neurons on all of the rythms(i.e. frequencies) in which hippocampus
+	has worked.
+
+	As mentioned previously the synaptic strength does not depend on the frequency and this means that the connections
+	having the higher average coherence indicate the most powerful synaptic strength.
+	In spite of this we decided to use the mean of coherences calculated on frequencies from $1Hz$ to $100Hz$.
+	The following formula was used in order to calculate coherence between two neurons is as follows:
+	\[
+		\rho(\vec{A}, \vec{B})=
+		\frac{1}{\overline{f} - \underline{f}}
+		\sum_{i=\underline{f}}^{\overline{f}}
+			C^{D}(\vec{A}, \vec{B})
+	\]
+	where $C^{D}$ is discretized version of $C_{xy}$, $\overline{f}=100, \underline{f}=1$.
+
+	The metric was implemented using scipy library.
+	As in previous section we have built a distribution of $\rho$ values first to find the optimal value for
+	the lower bound of $\underline{\rho}$. The distribution is shown on figure 11.
+	\img{../out/coh_dist_full.png}{Distribution of $\rho$ for coherence}
+
+	Based on this distribution we have selected the lower bound for our metric as $\underline{\rho}=0.1$.
+	Building graph with the described parameters has given the result which is shown on figure 12.
+	\img{../out/coherence_sequencing.png}{Graph built with use of coherence metric, $\underline{\rho}=0.1$}
+
+	The situation is better compared to correlation as we may clearly see rich club.
+	But in the same time there
+	is a lot of neurons which are not connected.
+
+	Another problem is the multi-edges which is the same to coherence is multi-edges which connect
+	a numerous count of neurons and also can be seen on a set of paths. We may say that this approach also
+	have not given a desired results for this task.
+
+	Additionally we have tried also raising and reducing value of $\underline{\rho}$, though reducing have
+	given us an almost full graph which was expected and rising up led to graph becoming less connected which is illustrated
+	on figure 13.
+	Though we may see that unlike in the case of correlation the only rich club is preserved even when
+	$\underline{\rho}$ has rise twice while in the case of correlation graph has lost most of its rich-clubs.
+
+\end{document}
